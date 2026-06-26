@@ -18,11 +18,12 @@ BANNER = """
 
 HELP_TEXT = """
 Commands:
-  /help          — Show this message
-  /prompts       — List available prompt templates
-  /resources     — List available resources
-    /reset         — Clear conversation history
-  /quit          — Exit FileSage
+  /help                         — Show this message
+  /prompts                      — List available prompt templates
+  /prompt <name> [arg=val ...]  — Run a prompt template (e.g. /prompt summarize_file file_path=main.py)
+  /resources                    — List available resources
+  /reset                        — Clear conversation history
+  /quit                         — Exit FileSage
 
 Or just type naturally:
   "summarize main.py"
@@ -79,6 +80,41 @@ class CliApp:
                         print(f"  • {r.uri} — {r.description or ''}")
                     print()
                     continue
+
+                if user_input.strip().startswith("/prompt "):
+                    parts = user_input.strip().split()
+                    if len(parts) < 2:
+                        print("Usage: /prompt <prompt_name> [arg1=value1 arg2=value2 ...]\n")
+                        continue
+                    prompt_name = parts[1]
+                    args = {}
+                    for part in parts[2:]:
+                        if "=" in part:
+                            k, v = part.split("=", 1)
+                            args[k] = v
+                    try:
+                        messages = await self.agent.get_prompt(prompt_name, args)
+                        prompt_text = ""
+                        for msg in messages:
+                            content = msg.content
+                            if hasattr(content, "text"):
+                                prompt_text += content.text + "\n"
+                            elif isinstance(content, dict) and "text" in content:
+                                prompt_text += content["text"] + "\n"
+                            elif hasattr(msg, "content") and isinstance(msg.content, str):
+                                prompt_text += msg.content + "\n"
+                        prompt_text = prompt_text.strip()
+                        if not prompt_text:
+                            print("Prompt generated no text content.\n")
+                            continue
+                        print(f"[Prompt: {prompt_name}] Sending expanded prompt to LLM:")
+                        print("-" * 50)
+                        print(prompt_text)
+                        print("-" * 50 + "\n")
+                        user_input = prompt_text
+                    except Exception as e:
+                        print(f"Error executing prompt: {e}\n")
+                        continue
 
                 print()
                 tool_calls: dict[int, dict] = {}
