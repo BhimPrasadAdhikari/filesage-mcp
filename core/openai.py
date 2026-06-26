@@ -182,8 +182,17 @@ class OpenAIService:
         tools: Optional[list[dict[str, Any]]] = None,
     ) -> OpenAIMessage:
         payload_messages = list(messages)
-        if system:
-            payload_messages.insert(0, {"role": "system", "content": system})
+        
+        default_system = (
+            "You are FileSage, an intelligent file system assistant.\n"
+            "You have access to a set of tools to read, write, search, list, scan, and tag files.\n"
+            "To interact with the filesystem (like creating/writing/reading/searching files), you MUST use the appropriate tool from your tools list. Do NOT write python code or scripts to do it yourself.\n"
+            "When calling tools, you must strictly follow the JSON schema of the tool arguments. Do not invent any new tool names, and do not use special code-interpreter tokens (like `<|python_tag|>`)."
+        )
+        
+        sys_prompt = system or default_system
+        if sys_prompt:
+            payload_messages.insert(0, {"role": "system", "content": sys_prompt})
 
         tools_payload, tool_choice = self._tool_payload(tools)
 
