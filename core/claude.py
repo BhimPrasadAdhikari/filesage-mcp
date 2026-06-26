@@ -1,10 +1,48 @@
-from anthropic import AsyncAnthropic 
-from anthropic.types import Message 
+from anthropic import AsyncAnthropic
+from anthropic.types import Message
+from mcp.shared.context import RequestContext
+from mcp.types import CreateMessageRequestParams, CreateMessageResult, TextContent
 
 class Claude:
     def __init__(self, model: str):
         self.client = AsyncAnthropic()
         self.model = model 
+
+    
+    
+    async def sampling_callback(
+        self,
+        context: RequestContext,
+        params: CreateMessageRequestParams,
+    ) -> CreateMessageResult:
+        """
+        Called when the MCP server requests a message from the LLM.
+        Converts MCP SamplingMessage format → OpenAI format → back to MCP.
+        """
+        messages = []
+ 
+        if params.systemPrompt:
+            messages.append({"role": "system", "content": params.systemPrompt})
+ 
+        for msg in params.messages:
+            if msg.content.type == "text":
+                messages.append({"role": msg.role, "content": msg.content.text})
+ 
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            max_tokens=params.maxTokens or 1000,
+        )
+ 
+        text = response.choices[0].message.content or ""
+ 
+        return CreateMessageResult(
+            role="assistant",
+            model=self.model,
+            content=TextContent(type="text", text=text),
+        )
+
+    
     
     def add_user_message(self, messages: list, message):
         user_message = {

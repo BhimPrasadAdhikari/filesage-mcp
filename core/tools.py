@@ -6,18 +6,18 @@ from pydantic import Field
 
 from core.server import mcp
 from core.security import is_path_allowed
-from core.utils import file_url_to_path
+from core.utils import file_url_to_path, resolve_tool_path
 
 @mcp.tool()
 async def read_file(
-    path: str = Field(description="Absolute path to the file to read"),
+    path: str = Field(description="Path to the file to read"),
     *,
     ctx: Context,
 ) -> str:
     """
     Read the full contents of a file. 
     """
-    file_path = Path(path).resolve()
+    file_path = await resolve_tool_path(path, ctx)
 
     if not await is_path_allowed(file_path, ctx):
         raise ValueError(f"Access denied: '{path}' is outside the allowed roots.")
@@ -30,7 +30,7 @@ async def read_file(
 
 @mcp.tool()
 async def write_file(
-    path: str = Field(description="Absolute path to the file to write"),
+    path: str = Field(description="Path to the file to write"),
     content: str = Field(description="The content to write to the file"),
     *,
     ctx: Context,
@@ -38,7 +38,7 @@ async def write_file(
     """
     Write or create a file with the given content
     """
-    file_path = Path(path).resolve()
+    file_path = await resolve_tool_path(path, ctx)
 
     if not await is_path_allowed(file_path, ctx):
         raise ValueError(f"Access denied: '{path}' is outside the allowed roots.")
@@ -51,19 +51,19 @@ async def write_file(
 
 @mcp.tool()
 async def list_dir(
-    path: str = Field(description="Absolute path to the directory to list"),
+    path: str = Field(description="Path to the directory to list"),
     *,
     ctx: Context,
 ) -> list[dict]:
     """
     List the contents of a directory with name, type, size, and path metadata.
     """
-    dir_path = Path(path).resolve()
+    dir_path = await resolve_tool_path(path, ctx)
 
     if not await is_path_allowed(dir_path, ctx):
         raise ValueError(f"Access denied: '{path}' is outside the allowed roots.")
     if not dir_path.is_dir():
-        reaise ValueError(f"Not a directory: {path}")
+        raise ValueError(f"Not a directory: {path}")
     
     entries = []
     for entry in sorted(dir_path.iterdir()):
@@ -119,7 +119,7 @@ async def search_files(
 
 @mcp.tool()
 async def scan_dir(
-    path: str = Field(description="Absolute path to the directory to deep scan"),
+    path: str = Field(description="Path to the directory to deep scan"),
     *,
     ctx: Context,
 ) -> dict:
@@ -128,12 +128,12 @@ async def scan_dir(
 
     Emits real-time logging messages and progress notifications during the scan. 
     """
-    dir_path = Path(path).resolve()
+    dir_path = await resolve_tool_path(path, ctx)
 
     if not await is_path_allowed(dir_path, ctx):
         raise ValueError(f"Access denied: '{path}' is outside the allowed roots.")
     if not dir_path.is_dir():
-        reaise ValueError(f"Not a directory: {path}")
+        raise ValueError(f"Not a directory: {path}")
     
     await ctx.info(f"Starting deep scan of: {path}")
 
@@ -148,7 +148,7 @@ async def scan_dir(
         "by_extension": {},
     }
 
-    for i, entry in sorted(all_entries):
+    for i, entry in enumerate(sorted(all_entries), 1):
         # report progress every 10% of the way through
 
         if total > 0 and i % max(1, total // 10) == 0:
@@ -170,7 +170,7 @@ async def scan_dir(
     await ctx.info(
         f"Scan complete - {stats['total_files']} files, "
         f"{stats['total_dirs']} dirs, "
-        f"{stats['total_size_bytes']:, } bytes"
+        f"{stats['total_size_bytes']:,} bytes"
     )
     return stats
 
@@ -188,15 +188,15 @@ async def auto_tag_file(
     if not await is_path_allowed(file_path, ctx):
         raise ValueError(f"Access denied: '{path}' is outside the allowed roots.")
     if not file_path.is_file():
-        reaise ValueError(f"Not a file: {path}")
+        raise ValueError(f"Not a file: {path}")
     
     # read upto 3000 chars long content for tagging 
     content = file_path.read_text(encoding="utf-8", errors="replace")[:3000]
 
-    file_name = file_path.name 
+    file_name = file_path.name
 
     prompt = (
-        f"Analyze this file named '{filename}' and generate 5–8 short, lowercase tags "
+        f"Analyze this file named '{file_name}' and generate 5-8 short, lowercase tags "
         f"that describe its purpose, technologies used, and topic area.\n\n"
         f"File content (first 3000 chars):\n{content}\n\n"
         f"Return ONLY a comma-separated list of tags. "

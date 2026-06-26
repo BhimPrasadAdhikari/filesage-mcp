@@ -6,10 +6,11 @@ Handle: roots injection, log callbacks, and the sampling callback
 that allows the server to invoke the LLM on Its own behalf.
 """
 
-from typing import Optional, Any 
+import inspect
+from typing import Optional, Any, Callable
 from contextlib import AsyncExitStack 
 from pathlib import Path 
-from pydantic import AnyUrl, FielUrl 
+from pydantic import AnyUrl
 
 import json 
 
@@ -32,6 +33,8 @@ class MCPClient:
         command: str,
         args: list[str],
         env: Optional[list[str]] = None,
+        roots: Optional[list[str]] = None,
+        sampling_callback: Optional[Callable] = None,
     ):
         self._command = command 
         self._args = args 
@@ -39,15 +42,15 @@ class MCPClient:
         self._roots = self._create_roots(roots) if roots else []
         self._session: Optional[ClientSession] = None 
         self._exit_stack: AsyncExitStack = AsyncExitStack()
+        self._sampling_callback = sampling_callback
     
     def _create_roots(self, root_paths: list[str]) -> list[Root]:
         """Convert plain path strings into MCP Root objects with file:// URIs."""
         roots = []
         for path_str in root_paths:
             p = Path(path_str).resolve()
-            file_url = FileUrl(f"file://{p}")
-            roots.append(Root(uri=fiel_url, name=p.name or "Root"))
-        return roots 
+            roots.append(Root(uri=p.as_uri(), name=p.name or "Root"))
+        return roots
     
     async def _handle_list_roots(
         self,
@@ -71,11 +74,20 @@ class MCPClient:
         )
         _read, _write = stdio_transport
 
+        session_kwargs: dict[str, Any] = {}
+        if self._roots:
+            session_kwargs["list_roots_callback"] = self._handle_list_roots
+
+        if self._sampling_callback:
+            init_params = inspect.signature(ClientSession.__init__).parameters
+            if "sampling_callback" in init_params:
+                session_kwargs["sampling_callback"] = self._sampling_callback
+
         self._session = await self._exit_stack.enter_async_context(
             ClientSession(
                 _read,
                 _write,
-                list_roots_callback=self._handle_list_roots if self._roots else None,
+                **session_kwargs,
             )
         )
 
@@ -100,7 +112,7 @@ class MCPClient:
         return result.prompts 
 
     async def get_prompt(self, prompt_name: str, args: dict[str, str]) -> list[types.PromptMessage]:
-        result await self.session().get_prompt(prompt_name, args)
+        result = await self.session().get_prompt(prompt_name, args)
         return result.messages 
     
     async def list_resources(self) -> list[types.Resource]:

@@ -15,10 +15,10 @@ async def is_path_allowed(requested_path: Path, ctx: Context) -> bool:
         if not check_path.exists():
             return False 
     else:
-        check_path = requested_path if requested_path.id_dir() else requested_path.parent 
+        check_path = requested_path if requested_path.is_dir() else requested_path.parent
     
-    for root in roots_result:
-        root_path = file_url_to_path(root.url)
+    for root in roots_result.roots:
+        root_path = file_url_to_path(root.uri)
         try:
             check_path.relative_to(root_path)
             return True 
