@@ -10,3 +10,4 @@ dist/
 .DS_Store
 *.log
 test_mcp.py
+node_modules/
