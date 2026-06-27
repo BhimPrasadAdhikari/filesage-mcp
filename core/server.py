@@ -28,7 +28,7 @@ port = _int_env("FASTMCP_PORT", 8001)
 
 mcp = FileSageMCP(
 	"FileSage",
-	log_level="ERROR",
+	log_level="INFO",
 	host=host,
 	port=port,
 	dependencies=["typer"],
