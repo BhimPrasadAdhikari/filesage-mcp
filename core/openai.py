@@ -177,7 +177,7 @@ class OpenAIService:
         self,
         messages: list[dict[str, Any]],
         system: Optional[str] = None,
-        temperature: float = 1.0,
+        temperature: float = 0.0,
         stop_sequences: Optional[list[str]] = None,
         tools: Optional[list[dict[str, Any]]] = None,
     ) -> OpenAIMessage:
@@ -232,7 +232,7 @@ class OpenAIService:
         self,
         messages: list[dict[str, Any]],
         system: Optional[str] = None,
-        temperature: float = 1.0,
+        temperature: float = 0.0,
         stop_sequences: Optional[list[str]] = None,
         tools: Optional[list[dict[str, Any]]] = None,
         on_event=None,
