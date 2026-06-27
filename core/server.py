@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 class FileSageMCP(FastMCP):
 	def run(
 		self,
-		transport: Literal["stdio", "sse", "streamable-http"] = "sse",
+		transport: Literal["stdio", "sse", "streamable-http"] = "streamable-http",
 		mount_path: str | None = None,
 	) -> None:
 		super().run(transport=transport, mount_path=mount_path)
